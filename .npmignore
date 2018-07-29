@@ -1,0 +1,9 @@
+.DS_Store
+yarn-error.log
+**/*.spec.js
+testHelpers/
+scripts/
+docker-compose.yml
+jest.config.js
+.prettierrc
+.travis.yml

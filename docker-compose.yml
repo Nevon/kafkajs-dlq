@@ -1,0 +1,21 @@
+version: '2'
+services:
+  zk:
+    image: wurstmeister/zookeeper:latest
+    ports:
+      - "2181:2181"
+  kafka:
+    image: wurstmeister/kafka:0.10.2.1 
+    ports:
+      - "9092:9092"
+    links:
+      - zk
+    environment:
+      KAFKA_BROKER_ID: 0
+    environment:
+      KAFKA_ADVERTISED_HOST_NAME: ${HOST_IP}
+      KAFKA_CREATE_TOPICS: "topic-test:3:1,topic-test-dead-letter-queue:3:1"
+      KAFKA_ZOOKEEPER_CONNECT: zk:2181
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock

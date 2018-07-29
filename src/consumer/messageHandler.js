@@ -27,6 +27,7 @@ module.exports = ({
           error: e.message || e,
           deadLetterQueue: deadLetterTopic,
           topic,
+          partition,
           offset: message.offset
         }
       );

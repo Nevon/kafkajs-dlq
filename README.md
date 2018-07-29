@@ -32,6 +32,7 @@ const { eachMessage } = Dlq.consumer({
     [topic]: 'example-dead-letter-queue'
   },
   producer,
+  consumer,
   eachMessage: async ({ topic, partition, message }) => {
     // If eachMessage rejects, the message will be
     // produced on the dead-letter queue

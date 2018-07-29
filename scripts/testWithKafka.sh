@@ -8,7 +8,7 @@ export HOST_IP=$(ifconfig | grep -E "([0-9]{1,3}\.){3}[0-9]{1,3}" | grep -v 127.
 find_container_id() {
   echo $(docker ps \
     --filter "status=running" \
-    --filter "label=com.docker.compose.project=kafkajs-dlq" \
+    --filter "label=com.docker.compose.project=kafkajsdlq" \
     --filter "label=com.docker.compose.service=kafka" \
     --no-trunc \
     -q)

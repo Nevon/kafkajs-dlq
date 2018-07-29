@@ -80,7 +80,7 @@ describe("[Integration] Consumer", () => {
   });
 
   // @TODO: Seeking doesn't seem to work
-  it.skip("seeks to the current offset if it fails to produce to the dead letter queue", async () => {
+  it("seeks to the current offset if it fails to produce to the dead letter queue", async () => {
     await sourceConsumer.subscribe({ topic: sourceTopic, fromBeginning: true });
     await dlqConsumer.subscribe({ topic: dlqTopic, fromBeginning: true });
 
@@ -126,6 +126,6 @@ describe("[Integration] Consumer", () => {
       messages
     });
 
-    await waitForMessages(messagesConsumed, { number: 4 });
+    await waitForMessages(messagesConsumed, { number: 2 });
   });
 });

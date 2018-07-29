@@ -22,8 +22,12 @@ const kafka = new Kafka({ ... })
 const consumer = kafka.consumer({ ... })
 const producer = kafka.producer()
 
+const topic = 'example-topic'
+
 const { eachMessage } = Dlq.consumer({
-  topic: 'example-dead-letter-queue',
+  topics: {
+    [topic]: 'example-dead-letter-queue'
+  },
   producer,
   eachMessage: async ({ topic, partition, message }) => {
     // If eachMessage rejects, the message will be
@@ -34,7 +38,7 @@ const { eachMessage } = Dlq.consumer({
 
 const run = async () => {
   await consumer.connect()
-  await consumer.subscribe({ topic: 'example-topic' })
+  await consumer.subscribe({ topic })
   await consumer.run({ eachMessage })
 }
 

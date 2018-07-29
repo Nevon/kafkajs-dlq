@@ -1,5 +1,8 @@
 # KafkaJS Dead Letter Queue
 
+[![Build Status](https://travis-ci.com/Nevon/kafkajs-dlq.svg?branch=master)](https://travis-ci.com/Nevon/kafkajs-dlq)
+[![npm version](https://badge.fury.io/js/kafkajs-dlq.svg)](https://badge.fury.io/js/kafkajs-dlq)
+
 [KafkaJS](https://github.com/tulios/kafkajs) plugin to handle message
 processing failures by forwarding problematic messages to a dead-letter
 queue.

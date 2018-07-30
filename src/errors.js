@@ -9,9 +9,11 @@ class KafkaJSDLQError extends Error {
 
 class KafkaJSDLQNotImplemented extends KafkaJSDLQError {}
 class KafkaJSDLQTimeout extends KafkaJSDLQError {}
+class KafkaJSDLQAbortBatch extends KafkaJSDLQError {}
 
 module.exports = {
   KafkaJSDLQError,
   KafkaJSDLQNotImplemented,
-  KafkaJSDLQTimeout
+  KafkaJSDLQTimeout,
+  KafkaJSDLQAbortBatch
 };

@@ -1,5 +1,5 @@
 const { consumer } = require("../../");
-const { KafkaJSDLQNotImplemented } = require("../errors");
+const { KafkaJSDLQNotImplemented, KafkaJSDLQAbortBatch } = require("../errors");
 
 describe("Consumer", () => {
   let sendMock, seekMock;
@@ -121,7 +121,7 @@ describe("Consumer", () => {
         });
       });
 
-      it("seeks back to the message offset when sending to the dead-letter queue fails", async () => {
+      it("throws a KafkaJSDLQAbortBatch error when sending to the dead-letter queue fails", async () => {
         const args = {
           topic: "source",
           partition: 0,
@@ -138,13 +138,9 @@ describe("Consumer", () => {
           throw new Error("Failed to send to dead-letter queue");
         });
 
-        await eachMessage(args);
-
-        expect(kafkaConsumer.seek).toHaveBeenCalledWith({
-          topic: args.topic,
-          partition: args.partition,
-          offset: args.message.offset
-        });
+        await expect(eachMessage(args)).rejects.toThrowError(
+          KafkaJSDLQAbortBatch
+        );
       });
     });
   });

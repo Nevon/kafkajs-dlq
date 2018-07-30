@@ -23,7 +23,7 @@ describe("[Integration] Consumer", () => {
       logLevel: logLevel.NOTHING,
       retry: {
         initialRetryTime: 100,
-        retries: 1
+        retries: 2
       }
     });
     sourceConsumer = client.consumer({

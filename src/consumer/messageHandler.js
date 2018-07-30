@@ -1,10 +1,8 @@
-module.exports = ({
-  eachMessage,
-  topics,
-  producer,
-  consumer,
-  logger
-}) => async (...args) => {
+const { KafkaJSDLQAbortBatch } = require("../errors");
+
+module.exports = ({ eachMessage, topics, producer, logger }) => async (
+  ...args
+) => {
   try {
     return await eachMessage(...args);
   } catch (e) {
@@ -22,7 +20,7 @@ module.exports = ({
       });
     } catch (e) {
       logger.error(
-        "Failed to send message to dead-letter queue. Seeking to current offset",
+        "Failed to send message to dead-letter queue. Restarting from last resolved offset.",
         {
           error: e.message || e,
           deadLetterQueue: deadLetterTopic,
@@ -32,11 +30,7 @@ module.exports = ({
         }
       );
 
-      consumer.seek({
-        topic,
-        partition,
-        offset: message.offset
-      });
+      throw new KafkaJSDLQAbortBatch(e);
     }
   }
 };

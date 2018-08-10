@@ -1,36 +1,37 @@
 const { KafkaJSDLQAbortBatch } = require("../errors");
+const { KafkaFailureAdapter } = require("../failureAdapters");
 
-module.exports = ({ eachMessage, topics, producer, logger }) => async (
-  ...args
-) => {
-  try {
-    return await eachMessage(...args);
-  } catch (e) {
-    const { message, topic, partition } = args[0];
-    const deadLetterTopic = topics[topic];
-
-    if (!deadLetterTopic) {
-      throw e;
-    }
-
+module.exports = ({ eachMessage, failureAdapter, logger }) => {
+  return async (...args) => {
     try {
-      await producer.send({
-        topic: deadLetterTopic,
-        messages: [message]
+      logger.info("Calling eachmessage", {
+        ...args
       });
+      return await eachMessage(...args);
     } catch (e) {
-      logger.error(
-        "Failed to send message to dead-letter queue. Restarting from last resolved offset.",
-        {
-          error: e.message || e,
-          deadLetterQueue: deadLetterTopic,
-          topic,
-          partition,
-          offset: message.offset
-        }
-      );
+      const { message, topic, partition } = args[0];
 
-      throw new KafkaJSDLQAbortBatch(e);
+      logger.warn("Failed to process message", {
+        error: e.message || e,
+        stack: e.stack
+      });
+
+      try {
+        await failureAdapter.onFailure({ topic, partition, message });
+      } catch (e) {
+        logger.error(
+          "Failed to send message via failure adapter. Restarting from last resolved offset.",
+          {
+            error: e.message || e,
+            topic,
+            partition,
+            offset: message.offset,
+            failureAdapter: failureAdapter.name
+          }
+        );
+
+        throw new KafkaJSDLQAbortBatch(e);
+      }
     }
-  }
+  };
 };

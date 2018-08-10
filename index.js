@@ -1,5 +1,7 @@
-const { consumer } = require("./src");
+const DLQ = require("./src");
+const FailureAdapters = require("./src/failureAdapters");
 
 module.exports = {
-  consumer
+  DLQ,
+  FailureAdapters
 };

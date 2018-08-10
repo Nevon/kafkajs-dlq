@@ -25,12 +25,11 @@ const client = new Kafka({ ... })
 const dlq = new DLQ({ client })
 
 const topic = 'example-topic'
+const failureAdapter = new failureAdapters.Kafka({ client, topic: `${topic}.dead-letter-queue` })
 
 const { eachMessage } = dlq.consumer({
   topics: {
-    [topic]: {
-      failureAdapter: failureAdapters.kafka({ topic: `${topic}.dead-letter-queue` })
-    }
+    [topic]: { failureAdapter }
   },
   eachMessage: async ({ topic, partition, message }) => {
     throw new Error('Failed to process message')

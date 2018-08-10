@@ -10,13 +10,15 @@ module.exports = class KafkaFailureAdapter extends FailureAdapter {
   }
 
   async onFailure({ message }) {
-    this.producer.logger().info("Received message in failure handler", {
-      message,
-      topic: this.topic
-    });
+    // @TODO: Remove once KafkaJS exposes connect/disconnect events
+    await this.producer.connect();
+
     await this.producer.send({
       topic: this.topic,
       messages: [message]
     });
+
+    // @TODO: Remove once KafkaJS exposes connect/disconnect events
+    await this.producer.disconnect();
   }
 };

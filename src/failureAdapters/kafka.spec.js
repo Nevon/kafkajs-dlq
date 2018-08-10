@@ -9,7 +9,9 @@ logger.namespace = () => logger;
 
 let producer = {
   logger: () => logger,
-  send: jest.fn()
+  send: jest.fn(),
+  connect: jest.fn(),
+  disconnect: jest.fn()
 };
 
 const client = {

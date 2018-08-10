@@ -1,5 +1,5 @@
 const { Kafka, logLevel } = require("kafkajs");
-const { DLQ, FailureAdapters } = require("../");
+const { DLQ, failureAdapters } = require("../");
 
 const {
   secureRandom,
@@ -55,7 +55,7 @@ describe("[Integration] Consumer", () => {
     await sourceConsumer.subscribe({ topic: sourceTopic, fromBeginning: true });
     await dlqConsumer.subscribe({ topic: dlqTopic, fromBeginning: true });
 
-    const failureAdapter = new FailureAdapters.KafkaFailureAdapter({
+    const sendToKafka = new failureAdapters.Kafka({
       topic: dlqTopic,
       client
     });
@@ -64,7 +64,11 @@ describe("[Integration] Consumer", () => {
 
     let sourceMessagesConsumed = [];
     const { eachMessage } = dlq.consumer({
-      failureAdapter,
+      topics: {
+        [sourceTopic]: {
+          failureAdapter: sendToKafka
+        }
+      },
       client,
       eachMessage: async event => {
         sourceMessagesConsumed.push(event);

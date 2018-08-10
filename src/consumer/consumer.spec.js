@@ -30,7 +30,7 @@ describe("Consumer", () => {
 
   test("throws on invalid arguments", () => {
     const args = {
-      failureAdapter,
+      topics: { [topic]: { failureAdapter: failureAdapter } },
       client,
       eachMessage: jest.fn(),
       eachBatch: jest.fn()
@@ -40,10 +40,22 @@ describe("Consumer", () => {
       () =>
         new Consumer({
           ...args,
-          failureAdapter: undefined
+          topics: undefined
         })
     ).toThrowError(
-      '"failureAdapter" needs to be an instance of an implementation of FailureAdapter'
+      '"topics" needs to be a failure configuration for a source topic'
+    );
+    expect(
+      () =>
+        new Consumer({
+          ...args,
+          topics: {
+            ...args.topics,
+            "some-topic": { failureAdapter: "not a failure adapter" }
+          }
+        })
+    ).toThrowError(
+      '"failureAdapter" for topic configuration "some-topic" needs to be an instance of an implementation of FailureAdapter'
     );
     expect(
       () =>
@@ -58,12 +70,13 @@ describe("Consumer", () => {
   });
 
   describe("eachMessage", () => {
-    let eachMessage, eachMessageMock;
+    let eachMessage, eachMessageMock, sourceTopic;
 
     beforeEach(() => {
+      sourceTopic = "source";
       eachMessageMock = jest.fn();
       eachMessage = new Consumer({
-        failureAdapter,
+        topics: { [sourceTopic]: { failureAdapter } },
         client,
         eachMessage: eachMessageMock
       }).handlers().eachMessage;
@@ -86,7 +99,7 @@ describe("Consumer", () => {
 
     it('passes the message to the failure adapter when "eachMessage" throws', async () => {
       const args = {
-        topic: "source",
+        topic: sourceTopic,
         partition: 0,
         message: {
           offset: 0,
@@ -105,7 +118,7 @@ describe("Consumer", () => {
 
     it("throws a KafkaJSDLQAbortBatch error when the failure adapter fails", async () => {
       const args = {
-        topic: "source",
+        topic: sourceTopic,
         partition: 0,
         message: {
           offset: 0,
@@ -129,7 +142,7 @@ describe("Consumer", () => {
   describe("eachBatch", () => {
     it("throws a KafkaJSDLQNotImplemented error", () => {
       const eachBatch = new Consumer({
-        failureAdapter,
+        topics: {},
         client,
         eachBatch: jest.fn()
       }).handlers().eachBatch;

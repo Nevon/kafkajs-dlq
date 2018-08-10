@@ -1,7 +1,7 @@
 const DLQ = require("./src");
-const FailureAdapters = require("./src/failureAdapters");
+const failureAdapters = require("./src/failureAdapters");
 
 module.exports = {
   DLQ,
-  FailureAdapters
+  failureAdapters
 };

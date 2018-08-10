@@ -1,23 +1,24 @@
 const { KafkaJSDLQAbortBatch } = require("../errors");
 const { KafkaFailureAdapter } = require("../failureAdapters");
 
-module.exports = ({ eachMessage, failureAdapter, logger }) => {
+module.exports = ({ eachMessage, topics, logger }) => {
   return async (...args) => {
     try {
-      logger.info("Calling eachmessage", {
-        ...args
-      });
       return await eachMessage(...args);
     } catch (e) {
       const { message, topic, partition } = args[0];
+      const topicConfiguration = topics[topic];
 
-      logger.warn("Failed to process message", {
-        error: e.message || e,
-        stack: e.stack
-      });
+      if (!topicConfiguration) {
+        throw e;
+      }
 
       try {
-        await failureAdapter.onFailure({ topic, partition, message });
+        await topicConfiguration.failureAdapter.onFailure({
+          topic,
+          partition,
+          message
+        });
       } catch (e) {
         logger.error(
           "Failed to send message via failure adapter. Restarting from last resolved offset.",
@@ -26,7 +27,7 @@ module.exports = ({ eachMessage, failureAdapter, logger }) => {
             topic,
             partition,
             offset: message.offset,
-            failureAdapter: failureAdapter.name
+            failureAdapter: topicConfiguration.failureAdapter.name
           }
         );
 

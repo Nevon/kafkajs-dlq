@@ -1,7 +1,7 @@
 const FailureAdapter = require("./adapter");
-const KafkaFailureAdapter = require("./kafka");
+const Kafka = require("./kafka");
 
 module.exports = {
   FailureAdapter,
-  KafkaFailureAdapter
+  Kafka
 };

@@ -1,6 +1,4 @@
-const KafkaFailureAdapter = require("./kafka");
-const { KafkaJSDLQAbortBatch } = require("../errors");
-
+const { Kafka: KafkaFailureAdapter } = require(".");
 let logger = {
   info: jest.fn(),
   warn: jest.fn(),

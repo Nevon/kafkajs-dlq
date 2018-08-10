@@ -12,23 +12,33 @@ const createLogger = client => {
 };
 
 module.exports = class Consumer {
-  constructor({ client, failureAdapter, eachMessage, eachBatch } = {}) {
+  constructor({ client, topics, eachMessage, eachBatch } = {}) {
     if (!eachMessage && !eachBatch) {
       throw new KafkaJSDLQError(
         'Either "eachMessage" or "eachBatch" needs to be a function'
       );
     }
 
-    if (!failureAdapter || !(failureAdapter instanceof FailureAdapter)) {
+    if (!topics) {
       throw new KafkaJSDLQError(
-        `"failureAdapter" needs to be an instance of an implementation of ${
-          FailureAdapter.name
-        }`
+        '"topics" needs to be a failure configuration for a source topic'
       );
     }
 
+    for (let topic of Object.keys(topics)) {
+      const { failureAdapter } = topics[topic] || {};
+
+      if (!failureAdapter || !(failureAdapter instanceof FailureAdapter)) {
+        throw new KafkaJSDLQError(
+          `"failureAdapter" for topic configuration "${topic}" needs to be an instance of an implementation of ${
+            FailureAdapter.name
+          }`
+        );
+      }
+    }
+
     this.client = client;
-    this.failureAdapter = failureAdapter;
+    this.topics = topics;
     this.eachMessage = eachMessage;
     this.eachBatch = eachBatch;
     this.logger = createLogger(client);
@@ -37,7 +47,7 @@ module.exports = class Consumer {
   handlers() {
     const eachMessage = createEachMessageHandler({
       eachMessage: this.eachMessage,
-      failureAdapter: this.failureAdapter,
+      topics: this.topics,
       logger: this.logger
     });
 

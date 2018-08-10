@@ -19,32 +19,20 @@ queue.
 
 ```javascript
 const { Kafka } = require('kafkajs')
-const DLQ = require('kafkajs-dlq')
+const { DLQ, failureAdapters } = require('kafkajs-dlq')
 
 const client = new Kafka({ ... })
 const dlq = new DLQ({ client })
 
 const topic = 'example-topic'
 
-const { eachMessage, disconnect } = dlq.consumer({
+const { eachMessage } = dlq.consumer({
   topics: {
     [topic]: {
-      delayedExecution: [
-        { topic: `${topic}.5m`, delay: 5 * 60 * 1000 },
-        { topic: `${topic}.20m`, delay: 20 * 60 * 1000 }
-      ],
-      onFailure: dlq.kafkaFailureAdapter({ topic: `${topic}.dead-letter-queue` })
+      failureAdapter: failureAdapters.kafka({ topic: `${topic}.dead-letter-queue` })
     }
   },
   eachMessage: async ({ topic, partition, message }) => {
-    // If eachMessage rejects, the message will be
-    // produced to the first delayed execution topic
-    // and re-consumed after the delay.
-    //
-    // Once it has failed to be processed in each of
-    // the delayed execution topics, it gets passed
-    // to the failure adapter. In this case, it will
-    // be published to the indicated topic.
     throw new Error('Failed to process message')
   }
 })
@@ -58,8 +46,4 @@ const run = async () => {
 }
 
 run()
-
-// Remember to call "disconnect" whenever you disconnect
-// your Kafka client
-await disconnect()
 ```

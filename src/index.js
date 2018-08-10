@@ -10,10 +10,10 @@ module.exports = class DLQ {
     this.client = client;
   }
 
-  consumer({ failureAdapter, eachMessage, eachBatch } = {}) {
+  consumer({ topics, eachMessage, eachBatch } = {}) {
     const consumer = new Consumer({
       client: this.client,
-      failureAdapter,
+      topics,
       eachMessage,
       eachBatch
     });

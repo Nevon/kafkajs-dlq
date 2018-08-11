@@ -1,6 +1,6 @@
 const createEachMessageHandler = require("./messageHandler");
 const { KafkaJSDLQError, KafkaJSDLQNotImplemented } = require("../errors");
-const FailureAdapter = require("../failureAdapters/adapter");
+const { FailureAdapter, _initialized } = require("../failureAdapters/adapter");
 
 const NAMESPACE = "KafkaJSDLQ";
 
@@ -11,8 +11,41 @@ const createLogger = client => {
   return rootLogger.namespace(NAMESPACE);
 };
 
+const _validate = Symbol();
+const _subscribe = Symbol();
+
 module.exports = class Consumer {
-  constructor({ client, topics, eachMessage, eachBatch } = {}) {
+  constructor(args = {}) {
+    Consumer[_validate](args);
+
+    const { consumer, client, topics, eachMessage, eachBatch } = args;
+
+    this.client = client;
+    this.consumer = consumer;
+    this.topics = topics;
+    this.eachMessage = eachMessage;
+    this.eachBatch = eachBatch;
+    this.logger = createLogger(client);
+  }
+
+  handlers() {
+    const eachMessage = createEachMessageHandler({
+      eachMessage: this.eachMessage,
+      topics: this.topics,
+      logger: this.logger
+    });
+
+    this[_subscribe]();
+
+    return {
+      eachMessage,
+      eachBatch: () => {
+        throw new KafkaJSDLQNotImplemented('"eachBatch" is not implemented');
+      }
+    };
+  }
+
+  static [_validate]({ consumer, topics, eachMessage, eachBatch }) {
     if (!eachMessage && !eachBatch) {
       throw new KafkaJSDLQError(
         'Either "eachMessage" or "eachBatch" needs to be a function'
@@ -22,6 +55,12 @@ module.exports = class Consumer {
     if (!topics) {
       throw new KafkaJSDLQError(
         '"topics" needs to be a failure configuration for a source topic'
+      );
+    }
+
+    if (!consumer) {
+      throw new KafkaJSDLQError(
+        '"consumer" needs to be an instance of KafkaJs#consumer'
       );
     }
 
@@ -36,26 +75,45 @@ module.exports = class Consumer {
         );
       }
     }
-
-    this.client = client;
-    this.topics = topics;
-    this.eachMessage = eachMessage;
-    this.eachBatch = eachBatch;
-    this.logger = createLogger(client);
   }
 
-  handlers() {
-    const eachMessage = createEachMessageHandler({
-      eachMessage: this.eachMessage,
-      topics: this.topics,
-      logger: this.logger
+  [_subscribe]() {
+    const topicAdapters = Object.keys(this.topics).map(topic => ({
+      topic,
+      adapter: this.topics[topic].failureAdapter
+    }));
+
+    this.consumer.on(this.consumer.events.CONNECT, async () => {
+      const adapterSetupPromises = topicAdapters.map(({ topic, adapter }) => {
+        this.logger.debug(`Invoking setup of failure adapter`, {
+          adapter: adapter.name,
+          topic
+        });
+
+        const promise = adapter.setup();
+        adapter[_initialized] = true;
+
+        return promise;
+      });
+
+      return Promise.all(adapterSetupPromises);
     });
 
-    return {
-      eachMessage,
-      eachBatch: () => {
-        throw new KafkaJSDLQNotImplemented('"eachBatch" is not implemented');
-      }
-    };
+    this.consumer.on(this.consumer.events.DISCONNECT, async () => {
+      const adapterTeardownPromises = topicAdapters.map(
+        ({ topic, adapter }) => {
+          this.logger.debug(`Invoking teardown of failure adapter`, {
+            adapter: adapter.name,
+            topic
+          });
+
+          const promise = adapter.teardown();
+          adapter[_initialized] = false;
+          return promise;
+        }
+      );
+
+      return Promise.all(adapterTeardownPromises);
+    });
   }
 };

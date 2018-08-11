@@ -10,8 +10,9 @@ module.exports = class DLQ {
     this.client = client;
   }
 
-  consumer({ topics, eachMessage, eachBatch } = {}) {
+  consumer({ consumer: kafkaJsConsumer, topics, eachMessage, eachBatch } = {}) {
     const consumer = new Consumer({
+      consumer: kafkaJsConsumer,
       client: this.client,
       topics,
       eachMessage,

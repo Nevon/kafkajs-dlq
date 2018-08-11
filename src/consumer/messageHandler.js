@@ -1,5 +1,13 @@
 const { KafkaJSDLQAbortBatch } = require("../errors");
-const { KafkaFailureAdapter } = require("../failureAdapters");
+const { _initialized } = require("../failureAdapters/adapter");
+
+const setupIfNeeded = async adapter => {
+  if (!adapter[_initialized]) {
+    await adapter.setup();
+
+    adapter[_initialized] = true;
+  }
+};
 
 module.exports = ({ eachMessage, topics, logger }) => {
   return async (...args) => {
@@ -14,6 +22,10 @@ module.exports = ({ eachMessage, topics, logger }) => {
       }
 
       try {
+        // Set up in case consumer was already connected
+        // before DLQ consumer was initialized
+        await setupIfNeeded(topicConfiguration.failureAdapter);
+
         await topicConfiguration.failureAdapter.onFailure({
           topic,
           partition,

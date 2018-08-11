@@ -64,6 +64,7 @@ describe("[Integration] Consumer", () => {
 
     let sourceMessagesConsumed = [];
     const { eachMessage } = dlq.consumer({
+      consumer: sourceConsumer,
       topics: {
         [sourceTopic]: {
           failureAdapter: sendToKafka

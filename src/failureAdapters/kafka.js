@@ -1,4 +1,4 @@
-const FailureAdapter = require("./adapter");
+const { FailureAdapter } = require("./adapter");
 
 module.exports = class KafkaFailureAdapter extends FailureAdapter {
   constructor({ client, topic }) {
@@ -9,16 +9,18 @@ module.exports = class KafkaFailureAdapter extends FailureAdapter {
     this.topic = topic;
   }
 
-  async onFailure({ message }) {
-    // @TODO: Remove once KafkaJS exposes connect/disconnect events
+  async setup() {
     await this.producer.connect();
+  }
 
+  async teardown() {
+    await this.producer.disconnect();
+  }
+
+  async onFailure({ message }) {
     await this.producer.send({
       topic: this.topic,
       messages: [message]
     });
-
-    // @TODO: Remove once KafkaJS exposes connect/disconnect events
-    await this.producer.disconnect();
   }
 };

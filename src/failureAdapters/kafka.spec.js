@@ -23,6 +23,22 @@ const topic = "failure-topic";
 const message = { key: "key", value: "value" };
 
 describe("Kafka Failure Adapter", () => {
+  it("connects the producer when initialized", async () => {
+    const adapter = new KafkaFailureAdapter({ client, topic });
+
+    await adapter.setup();
+
+    expect(producer.connect).toHaveBeenCalled();
+  });
+
+  it("disconnects the producer on teardown", async () => {
+    const adapter = new KafkaFailureAdapter({ client, topic });
+
+    await adapter.teardown();
+
+    expect(producer.disconnect).toHaveBeenCalled();
+  });
+
   it("produces the message to the specified topic when invoked", async () => {
     producer.send.mockImplementation(() => Promise.resolve());
     const adapter = new KafkaFailureAdapter({ client, topic });

@@ -1,9 +1,11 @@
+const _initialized = Symbol();
+
 /**
  * FailureAdapters are expected to implement the async
  * method "onFailure". In case the failure handling fails,
  * they are expected to throw an error.
  */
-module.exports = class FailureAdapter {
+class FailureAdapter {
   constructor() {
     if (this.constructor === FailureAdapter) {
       throw new TypeError(
@@ -20,6 +22,10 @@ module.exports = class FailureAdapter {
     }
   }
 
+  async setup() {}
+
+  async teardown() {}
+
   async onFailure({ topic, partition, message }) {
     throw new TypeError(
       `Calling abstract method ${this.onFailure.name} of ${
@@ -27,4 +33,9 @@ module.exports = class FailureAdapter {
       }.`
     );
   }
+}
+
+module.exports = {
+  FailureAdapter,
+  _initialized
 };

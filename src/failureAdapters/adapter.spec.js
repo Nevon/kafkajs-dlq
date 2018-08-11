@@ -1,4 +1,4 @@
-const Adapter = require("./adapter");
+const { FailureAdapter: Adapter } = require("./adapter");
 
 describe("Failure Adapter", () => {
   it("should throw when instantiated", () => {

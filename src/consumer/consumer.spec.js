@@ -5,15 +5,30 @@ const { FailureAdapter } = require("../failureAdapters/index");
 let logger = {
   info: jest.fn(),
   warn: jest.fn(),
-  error: jest.fn()
+  error: jest.fn(),
+  debug: jest.fn()
 };
 
 logger.namespace = () => logger;
 
 describe("Consumer", () => {
-  let client, failureAdapter, topic, onFailureMock;
+  let client,
+    failureAdapter,
+    topic,
+    onFailureMock,
+    setupMock,
+    teardownMock,
+    kafkaJsConsumer;
 
   class MockFailureAdapter extends FailureAdapter {
+    async setup() {
+      return setupMock();
+    }
+
+    async teardown() {
+      return teardownMock();
+    }
+
     async onFailure(...args) {
       return onFailureMock(...args);
     }
@@ -21,15 +36,25 @@ describe("Consumer", () => {
 
   beforeEach(() => {
     onFailureMock = jest.fn();
+    setupMock = jest.fn();
+    teardownMock = jest.fn();
     topic = "failure-topic";
     failureAdapter = new MockFailureAdapter();
     client = {
       logger
     };
+    kafkaJsConsumer = {
+      on: jest.fn(),
+      events: {
+        CONNECT: Symbol(),
+        DISCONNECT: Symbol()
+      }
+    };
   });
 
   test("throws on invalid arguments", () => {
     const args = {
+      consumer: kafkaJsConsumer,
       topics: { [topic]: { failureAdapter: failureAdapter } },
       client,
       eachMessage: jest.fn(),
@@ -67,6 +92,70 @@ describe("Consumer", () => {
     ).toThrowError(
       'Either "eachMessage" or "eachBatch" needs to be a function'
     );
+    expect(
+      () =>
+        new Consumer({
+          ...args,
+          consumer: undefined
+        })
+    ).toThrowError('"consumer" needs to be an instance of KafkaJs#consumer');
+  });
+
+  it("calls lifecycle methods on failure adapters when the main consumer connects and disconnects", async () => {
+    let subscriptions = {};
+    const consumer = new Consumer({
+      topics: { [topic]: { failureAdapter: failureAdapter } },
+      client,
+      eachMessage: jest.fn(),
+      eachBatch: jest.fn(),
+      consumer: {
+        ...kafkaJsConsumer,
+        on: (event, cb) => {
+          subscriptions[event] = cb;
+        }
+      }
+    });
+
+    consumer.handlers();
+
+    await subscriptions[kafkaJsConsumer.events.CONNECT]();
+    expect(setupMock).toHaveBeenCalled();
+
+    await subscriptions[kafkaJsConsumer.events.DISCONNECT]();
+    expect(teardownMock).toHaveBeenCalled();
+  });
+
+  it("calls FailureAdapter#setup on demand if the CONNECT event was never received", async () => {
+    let subscriptions = {};
+    const eachMessageMock = jest.fn().mockImplementationOnce(() => {
+      throw new Error("Something went wrong");
+    });
+    const consumer = new Consumer({
+      topics: { [topic]: { failureAdapter: failureAdapter } },
+      client,
+      eachMessage: eachMessageMock,
+      eachBatch: jest.fn(),
+      consumer: {
+        ...kafkaJsConsumer,
+        on: (event, cb) => {
+          subscriptions[event] = cb;
+        }
+      }
+    });
+
+    const eachMessage = consumer.handlers().eachMessage;
+
+    await eachMessage({
+      topic,
+      partition: 0,
+      message: {
+        offset: 0,
+        key: 1,
+        value: "message"
+      }
+    });
+
+    expect(setupMock).toHaveBeenCalled();
   });
 
   describe("eachMessage", () => {
@@ -76,6 +165,7 @@ describe("Consumer", () => {
       sourceTopic = "source";
       eachMessageMock = jest.fn();
       eachMessage = new Consumer({
+        consumer: kafkaJsConsumer,
         topics: { [sourceTopic]: { failureAdapter } },
         client,
         eachMessage: eachMessageMock
@@ -142,6 +232,7 @@ describe("Consumer", () => {
   describe("eachBatch", () => {
     it("throws a KafkaJSDLQNotImplemented error", () => {
       const eachBatch = new Consumer({
+        consumer: kafkaJsConsumer,
         topics: {},
         client,
         eachBatch: jest.fn()

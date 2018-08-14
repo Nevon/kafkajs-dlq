@@ -1,5 +1,5 @@
 const { Kafka, logLevel } = require("kafkajs");
-const Dlq = require("kafkajs-dlq");
+const { DLQ, failureAdapters } = require("../");
 
 const {
   secureRandom,
@@ -23,7 +23,7 @@ describe("[Integration] Consumer", () => {
       logLevel: logLevel.NOTHING,
       retry: {
         initialRetryTime: 100,
-        retries: 1
+        retries: 2
       }
     });
     sourceConsumer = client.consumer({
@@ -55,11 +55,22 @@ describe("[Integration] Consumer", () => {
     await sourceConsumer.subscribe({ topic: sourceTopic, fromBeginning: true });
     await dlqConsumer.subscribe({ topic: dlqTopic, fromBeginning: true });
 
+    const sendToKafka = new failureAdapters.Kafka({
+      topic: dlqTopic,
+      client
+    });
+
+    const dlq = new DLQ({ client });
+
     let sourceMessagesConsumed = [];
-    const { eachMessage } = Dlq.consumer({
-      topics: { [sourceTopic]: dlqTopic },
+    const { eachMessage } = dlq.consumer({
       consumer: sourceConsumer,
-      producer,
+      topics: {
+        [sourceTopic]: {
+          failureAdapter: sendToKafka
+        }
+      },
+      client,
       eachMessage: async event => {
         sourceMessagesConsumed.push(event);
 
@@ -92,74 +103,5 @@ describe("[Integration] Consumer", () => {
     expect(messagesConsumed.map(toComparable)).toEqual(
       sourceMessagesConsumed.filter((_, i) => i % 2 !== 0).map(toComparable)
     );
-  });
-
-  it("seeks to the current offset if it fails to produce to the dead letter queue", async () => {
-    await sourceConsumer.subscribe({ topic: sourceTopic, fromBeginning: true });
-    await dlqConsumer.subscribe({ topic: dlqTopic, fromBeginning: true });
-
-    let firstProduceCall = true;
-    let sourceMessagesConsumed = [];
-    const { eachMessage } = Dlq.consumer({
-      topics: { [sourceTopic]: dlqTopic },
-      consumer: sourceConsumer,
-      producer: {
-        send: async (...args) => {
-          if (firstProduceCall) {
-            firstProduceCall = false;
-            throw new Error("Failed to produce");
-          }
-
-          await producer.send(...args);
-        }
-      },
-      eachMessage: async event => {
-        sourceMessagesConsumed.push(event);
-
-        if (sourceMessagesConsumed.length < 3) {
-          throw new Error("Failed to process message");
-        }
-      }
-    });
-
-    const messagesConsumed = [];
-    dlqConsumer.run({
-      eachMessage: async event => messagesConsumed.push(event)
-    });
-
-    sourceConsumer.run({ eachMessage });
-
-    const messages = [
-      { key: `key-${secureRandom()}`, value: `key-${secureRandom()}` },
-      { key: `key-${secureRandom()}`, value: `key-${secureRandom()}` },
-      { key: `key-${secureRandom()}`, value: `key-${secureRandom()}` },
-      { key: `key-${secureRandom()}`, value: `key-${secureRandom()}` }
-    ];
-
-    for (let message of messages) {
-      await producer.send({
-        topic: sourceTopic,
-        messages: [message]
-      });
-    }
-
-    await waitForMessages(messagesConsumed, { number: 1 });
-    await waitForMessages(sourceMessagesConsumed, { number: 3 });
-
-    /**
-     * @TODO: KafkaJS does not abort the current batch when
-     * calling `seek` within `eachMessage`, which means that
-     * if the batch contains 4 messages, the first one is rejected
-     * and we fail to send it to the DLQ, we will still process
-     * the remaining 3 messages before seeking back to the first,
-     * which means that the 3 will be processed twice.
-     *
-     * expect(
-     *   messagesConsumed.map(toComparable).map(({ key, value }) => ({
-     *     key: key.toString(),
-     *     value: value.toString()
-     *   }))
-     * ).toEqual([messages[0]]);
-     */
   });
 });

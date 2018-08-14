@@ -39,6 +39,6 @@ TEST_EXIT=$?
 echo
 
 if [ -z ${DO_NOT_STOP} ]; then
-  docker-compose down --remove-orphans
+  docker-compose -p kafkajsdlq down --remove-orphans
 fi
 exit ${TEST_EXIT}

@@ -61,7 +61,7 @@ waitForNode(kafkaContainerId);
 console.log("\nAll nodes up:");
 console.log(
   execa
-    .shellSync(`HOST_IP=${process.env.HOST_IP} docker-compose ps`)
+    .shellSync(`HOST_IP=${process.env.HOST_IP} docker-compose -p kafkajsdlq ps`)
     .stdout.toString("utf-8")
 );
 

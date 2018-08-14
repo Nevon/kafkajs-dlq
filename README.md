@@ -19,26 +19,24 @@ queue.
 
 ```javascript
 const { Kafka } = require('kafkajs')
-const Dlq = require('kafkajs-dlq')
+const { DLQ, failureAdapters } = require('kafkajs-dlq')
 
-const kafka = new Kafka({ ... })
-const consumer = kafka.consumer({ ... })
-const producer = kafka.producer()
+const client = new Kafka({ ... })
+const dlq = new DLQ({ client })
 
 const topic = 'example-topic'
+const failureAdapter = new failureAdapters.Kafka({ client, topic: `${topic}.dead-letter-queue` })
 
-const { eachMessage } = Dlq.consumer({
+const { eachMessage } = dlq.consumer({
   topics: {
-    [topic]: 'example-dead-letter-queue'
+    [topic]: { failureAdapter }
   },
-  producer,
-  consumer,
   eachMessage: async ({ topic, partition, message }) => {
-    // If eachMessage rejects, the message will be
-    // produced on the dead-letter queue
     throw new Error('Failed to process message')
   }
 })
+
+const consumer = client.consumer({ ... })
 
 const run = async () => {
   await consumer.connect()

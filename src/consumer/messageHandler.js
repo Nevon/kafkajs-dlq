@@ -1,42 +1,50 @@
-module.exports = ({
-  eachMessage,
-  topics,
-  producer,
-  consumer,
-  logger
-}) => async (...args) => {
-  try {
-    return await eachMessage(...args);
-  } catch (e) {
-    const { message, topic, partition } = args[0];
-    const deadLetterTopic = topics[topic];
+const { KafkaJSDLQAbortBatch } = require("../errors");
+const { _initialized } = require("../failureAdapters/adapter");
 
-    if (!deadLetterTopic) {
-      throw e;
-    }
+const setupIfNeeded = async adapter => {
+  if (!adapter[_initialized]) {
+    await adapter.setup();
 
+    adapter[_initialized] = true;
+  }
+};
+
+module.exports = ({ eachMessage, topics, logger }) => {
+  return async (...args) => {
     try {
-      await producer.send({
-        topic: deadLetterTopic,
-        messages: [message]
-      });
+      return await eachMessage(...args);
     } catch (e) {
-      logger.error(
-        "Failed to send message to dead-letter queue. Seeking to current offset",
-        {
-          error: e.message || e,
-          deadLetterQueue: deadLetterTopic,
+      const { message, topic, partition } = args[0];
+      const topicConfiguration = topics[topic];
+
+      if (!topicConfiguration) {
+        throw e;
+      }
+
+      try {
+        // Set up in case consumer was already connected
+        // before DLQ consumer was initialized
+        await setupIfNeeded(topicConfiguration.failureAdapter);
+
+        await topicConfiguration.failureAdapter.onFailure({
           topic,
           partition,
-          offset: message.offset
-        }
-      );
+          message
+        });
+      } catch (e) {
+        logger.error(
+          "Failed to send message via failure adapter. Restarting from last resolved offset.",
+          {
+            error: e.message || e,
+            topic,
+            partition,
+            offset: message.offset,
+            failureAdapter: topicConfiguration.failureAdapter.name
+          }
+        );
 
-      consumer.seek({
-        topic,
-        partition,
-        offset: message.offset
-      });
+        throw new KafkaJSDLQAbortBatch(e);
+      }
     }
-  }
+  };
 };

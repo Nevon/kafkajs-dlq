@@ -10,13 +10,43 @@ module.exports = class DLQ {
     this.client = client;
   }
 
-  consumer({ consumer: kafkaJsConsumer, topics, eachMessage, eachBatch } = {}) {
+  /**
+   * {
+   *   topics: {
+   *     [topic]: {
+   *       delayedExecution: [
+   *         { topic: `${topic}.5m`, delay: 5 * 60 * 1000 },
+   *         { topic: `${topic}.15m`, delay: 15 * 60 * 1000 }
+   *       ],
+   *       failureAdapter
+   *     }
+   *   },
+   *   eachMessage: async ({ topic, partition, message }) => {
+   *     throw new Error('Failed to process message')
+   *   },
+   *   producerOptions: {}, // optional
+   *   producerSendOptions: {}, // optional
+   * }
+   *
+   * @param {Object} topics
+   * @param {function} [eachMessage]
+   * @param {Object} [producerOptions = {}]
+   * @param {Object} [producerSendOptions = {}]
+   */
+  consumer({
+    consumer: kafkaJsConsumer,
+    topics,
+    eachMessage,
+    producerOptions = {},
+    producerSendOptions = {}
+  } = {}) {
     const consumer = new Consumer({
       consumer: kafkaJsConsumer,
       client: this.client,
       topics,
       eachMessage,
-      eachBatch
+      producerOptions,
+      producerSendOptions
     });
 
     return consumer.handlers();

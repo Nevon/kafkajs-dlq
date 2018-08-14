@@ -9,16 +9,59 @@ const setupIfNeeded = async adapter => {
   }
 };
 
-module.exports = ({ eachMessage, topics, logger }) => {
+class DQLMessage {
+  constructor(topics, { message, topic, partition }) {
+    this.topics = topics;
+    this.message = message;
+    this.topic = topic;
+    this.partition = partition;
+    this.originTopic = this.message.headers["DLQ-Origin"] || this.topic;
+    this.delayedConfigs = this.topics[this.originTopic];
+  }
+
+  forwardToConfig() {
+    const { delayedExecution } = this.delayedConfigs;
+    const currentConfigIndex = (delayedExecution || []).indexOf(
+      delayedExecution.find(config => config.topic === this.topic)
+    );
+
+    const forwardToConfig = delayedExecution[currentConfigIndex + 1];
+    if (forwardToConfig) {
+      return forwardToConfig;
+    }
+  }
+
+  toKafkaJS() {
+    return {
+      key: this.message.key,
+      value: this.message.value,
+      headers: {
+        ...this.message.headers,
+        "DLQ-Origin": this.originTopic,
+        "DLQ-Published-At": new Date().toISOString()
+      }
+    };
+  }
+}
+
+module.exports = ({ producer, eachMessage, topics, logger }) => {
   return async (...args) => {
     try {
       return await eachMessage(...args);
     } catch (e) {
-      const { message, topic, partition } = args[0];
-      const topicConfiguration = topics[topic];
+      const message = new DQLMessage(topics, args[0]);
+      const topicConfiguration = message.delayedConfigs;
 
       if (!topicConfiguration) {
         throw e;
+      }
+
+      const forwardToConfig = message.forwardToConfig();
+      if (forwardToConfig) {
+        return producer.send({
+          topic: forwardToConfig.topic,
+          messages: [message.toKafkaJS()]
+        });
       }
 
       try {

@@ -1,6 +1,7 @@
 const createEachMessageHandler = require("./messageHandler");
 const { KafkaJSDLQError, KafkaJSDLQNotImplemented } = require("../errors");
 const { FailureAdapter, _initialized } = require("../failureAdapters/adapter");
+const DQLProducer = require("./producer");
 
 const NAMESPACE = "KafkaJSDLQ";
 
@@ -18,18 +19,29 @@ module.exports = class Consumer {
   constructor(args = {}) {
     Consumer[_validate](args);
 
-    const { consumer, client, topics, eachMessage, eachBatch } = args;
+    const {
+      consumer,
+      client,
+      topics,
+      eachMessage,
+      producerOptions,
+      producerSendOptions
+    } = args;
 
     this.client = client;
     this.consumer = consumer;
     this.topics = topics;
     this.eachMessage = eachMessage;
-    this.eachBatch = eachBatch;
     this.logger = createLogger(client);
+    this.producer = new DQLProducer(
+      this.client.producer(producerOptions),
+      producerSendOptions
+    );
   }
 
   handlers() {
     const eachMessage = createEachMessageHandler({
+      producer: this.producer,
       eachMessage: this.eachMessage,
       topics: this.topics,
       logger: this.logger
@@ -84,6 +96,7 @@ module.exports = class Consumer {
     }));
 
     this.consumer.on(this.consumer.events.CONNECT, async () => {
+      await this.producer.connect();
       const adapterSetupPromises = topicAdapters.map(({ topic, adapter }) => {
         this.logger.debug(`Invoking setup of failure adapter`, {
           adapter: adapter.name,

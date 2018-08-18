@@ -116,14 +116,6 @@ describe("[Integration] Consumer", () => {
         topic: `${sourceTopic}.5m`,
         fromBeginning: true
       });
-      await dlqConsumer.subscribe({
-        topic: `${sourceTopic}.25m`,
-        fromBeginning: true
-      });
-      await dlqConsumer.subscribe({
-        topic: `${sourceTopic}.45m`,
-        fromBeginning: true
-      });
 
       const discardOnFailure = new failureAdapters.Discard({
         topic: sourceTopic,
@@ -162,30 +154,16 @@ describe("[Integration] Consumer", () => {
       const messages = [
         {
           key: `key-${secureRandom()}`,
-          value: `key-${secureRandom()}`,
-          headers: {}
+          value: `key-${secureRandom()}`
         }
       ];
 
       await producer.send({ topic: sourceTopic, messages });
-      await waitForMessages(messagesConsumed, { number: 3 });
-
-      expect(message[0].topic).toEqual(`${sourceTopic}.5m`);
-      expect(message[0].headers).toEqual({
-        "DLQ-Origin": sourceTopic,
-        "DLQ-Published-At": expect.any(String)
-      });
-
-      expect(message[1].topic).toEqual(`${sourceTopic}.25m`);
-      expect(message[1].headers).toEqual({
-        "DLQ-Origin": sourceTopic,
-        "DLQ-Published-At": expect.any(String)
-      });
-
-      expect(message[2].topic).toEqual(`${sourceTopic}.45m`);
-      expect(message[2].headers).toEqual({
-        "DLQ-Origin": sourceTopic,
-        "DLQ-Published-At": expect.any(String)
+      await waitForMessages(messagesConsumed);
+      expect(messagesConsumed[0].topic).toEqual(`${sourceTopic}.5m`);
+      expect(messagesConsumed[0].message.headers).toEqual({
+        "DLQ-Origin": Buffer.from(sourceTopic),
+        "DLQ-Published-At": expect.any(Buffer)
       });
     });
   });
